@@ -26,6 +26,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isVerified: boolean;
+  isApproved: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -85,15 +87,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(profileData as Profile);
       }
 
-      // Fetch role
+      // Fetch role & approval
       const { data: roleData } = await supabase
         .from("user_roles")
-        .select("role")
+        .select("role, approved")
         .eq("user_id", userId)
         .maybeSingle();
 
       if (roleData) {
         setRole(roleData.role as AppRole);
+        setIsApproved(roleData.approved);
       } else {
         // Fallback to metadata if DB entry is not yet ready
         const metaRole = (await supabase.auth.getUser()).data.user?.user_metadata?.role;
@@ -167,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signOut,
         isVerified,
+        isApproved: role === 'admin' ? true : isApproved, // Admins auto-approved
       }}
     >
       {children}

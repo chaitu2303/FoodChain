@@ -111,6 +111,32 @@ export default function VolunteerDashboard() {
     }
   };
 
+  // Live Tracking Simulation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (activeTask?.status === 'picked_up') {
+      interval = setInterval(async () => {
+        // Simulate movement
+        const newLat = 28.6139 + (Math.random() - 0.5) * 0.01;
+        const newLng = 77.2090 + (Math.random() - 0.5) * 0.01;
+
+        // Update Backend
+        await supabase.from('deliveries').upsert({
+          donation_id: activeTask.donation_id,
+          volunteer_id: user?.id,
+          live_lat: newLat,
+          live_lng: newLng,
+          status: 'picked_up'
+        }, { onConflict: 'donation_id' });
+
+        console.log("📍 Live location updated:", newLat, newLng);
+      }, 5000);
+    }
+
+    return () => clearInterval(interval);
+  }, [activeTask, user]);
+
   const handleUpdateStatus = async (newStatus: string) => {
     if (!activeTask) return;
     try {
@@ -123,6 +149,17 @@ export default function VolunteerDashboard() {
 
       if (newStatus === 'delivered' || newStatus === 'picked_up') {
         await supabase.from('donations').update({ status: newStatus }).eq('id', activeTask.donation_id);
+      }
+
+      // Start Tracking on Pickup
+      if (newStatus === 'picked_up') {
+        await supabase.from('deliveries').insert({
+          donation_id: activeTask.donation_id,
+          volunteer_id: user?.id,
+          live_lat: 28.6139,
+          live_lng: 77.2090,
+          status: 'picked_up'
+        });
       }
 
       toast({ title: "Status Updated", description: `Task marked as ${newStatus.replace('_', ' ')}` });

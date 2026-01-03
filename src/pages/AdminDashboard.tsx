@@ -51,6 +51,7 @@ interface UserProfile {
   location: string | null;
   role?: string;
   is_verified?: boolean;
+  approved?: boolean; // Added field
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -113,7 +114,8 @@ export default function AdminDashboard() {
         const roleEntry = rolesData?.find(r => r.user_id === profile.user_id);
         return {
           ...profile,
-          role: roleEntry?.role || 'user'
+          role: roleEntry?.role || 'user',
+          approved: roleEntry?.approved || false
         };
       });
 
@@ -232,15 +234,25 @@ export default function AdminDashboard() {
 
   const handleVerifyUser = async (userId: string, status: boolean) => {
     try {
-      const { error } = await supabase
+      // 1. Update Profile Verification (Legacy/NGO specific)
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ is_verified: status })
         .eq('user_id', userId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      // 2. Update Access Approval (User Roles)
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .update({ approved: status })
+        .eq('user_id', userId);
+
+      if (roleError) throw roleError;
+
       toast({
-        title: status ? "User Verified" : "Verification Revoked",
-        description: `User access has been ${status ? "granted" : "restricted"}.`
+        title: status ? "Access Granted" : "Access Revoked",
+        description: `User has been ${status ? "approved" : "restricted"}.`
       });
       fetchData();
     } catch (error: any) {
@@ -514,10 +526,10 @@ export default function AdminDashboard() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <p className="font-medium">{user.full_name}</p>
-                                  {user.is_verified ? (
-                                    <Badge variant="verified" className="text-xs h-5">Verified</Badge>
+                                  {user.approved ? (
+                                    <Badge variant="verified" className="text-xs h-5">Active</Badge>
                                   ) : (
-                                    <Badge variant="outline" className="text-xs h-5 text-yellow-600 border-yellow-200 bg-yellow-50">Pending</Badge>
+                                    <Badge variant="outline" className="text-xs h-5 text-red-600 border-red-200 bg-red-50">Pending Approval</Badge>
                                   )}
                                 </div>
                                 <p className="text-sm text-muted-foreground flex items-center gap-2">
@@ -527,11 +539,11 @@ export default function AdminDashboard() {
                             </div>
                             <div className="flex items-center gap-2">
                               <Button
-                                variant={user.is_verified ? "outline" : "success"}
+                                variant={user.approved ? "outline" : "default"}
                                 size="sm"
-                                onClick={() => handleVerifyUser(user.user_id, !user.is_verified)}
+                                onClick={() => handleVerifyUser(user.user_id, !user.approved)}
                               >
-                                {user.is_verified ? "Revoke Access" : "Approve User"}
+                                {user.approved ? "Revoke Access" : "Grant Access"}
                               </Button>
                               <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteUser(user.user_id)}>
                                 <Ban className="w-4 h-4" />

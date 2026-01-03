@@ -105,14 +105,7 @@ export default function DonorDashboard() {
     setLoading(true);
     setErrorDetails(null);
     try {
-      // 1. Check for Placeholder Config
-      // @ts-ignore
-      const url = supabase.supabaseUrl || "";
-      if (url.includes("YOUR_PROJECT_ID")) {
-        throw new Error("CRITICAL: You are using placeholder .env values. Please update .env with your actual Supabase URL.");
-      }
-
-      // 2. Fetch Donations ONLY (Diagnostic Mode)
+      // 1. Fetch Donations
       const { data: donationsData, error: donationsError } = await supabase
         .from('donations')
         .eq('donor_id', user?.id)
@@ -120,25 +113,48 @@ export default function DonorDashboard() {
 
       if (donationsError) throw donationsError;
 
-      // 3. Skip Joins for now to prove connection works
-      /*
+      // 2. Fetch Related Data (Tasks, Volunteers, Profiles)
       const donationIds = (donationsData || []).map(d => d.id);
-      const { data: tasksData } = await supabase.from('volunteer_tasks').select('*').in('donation_id', donationIds);
-      const { data: volunteersData } = await supabase.from('volunteers').select('*');
-      const { data: profilesData } = await supabase.from('profiles').select('*');
-      */
 
-      // Simple map without enrichment
-      const simpleDonations = (donationsData || []).map(d => ({
-        ...d,
-        volunteer_tasks: [] // Empty for now
-      }));
+      const { data: tasksData } = await supabase
+        .from('volunteer_tasks')
+        .select('*')
+        .in('donation_id', donationIds);
 
-      setDonations(simpleDonations);
+      const { data: volunteersData } = await supabase
+        .from('volunteers')
+        .select('*');
+
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('*');
+
+      // 3. Manual Join
+      const fullDonations = (donationsData || []).map(donation => {
+        // Find tasks for this donation
+        const tasks = (tasksData || []).filter(t => t.donation_id === donation.id);
+
+        // Enrich tasks with volunteer profiles
+        const enrichedTasks = tasks.map(task => {
+          const volunteer = volunteersData?.find(v => v.id === task.volunteer_id);
+          const profile = volunteer ? profilesData?.find(p => p.user_id === volunteer.user_id) : null;
+          return {
+            ...task,
+            profiles: profile ? { full_name: profile.full_name } : null
+          };
+        });
+
+        return {
+          ...donation,
+          volunteer_tasks: enrichedTasks
+        };
+      });
+
+      setDonations(fullDonations);
     } catch (error: any) {
       console.error(error);
       setErrorDetails(error.message);
-      toast({ title: "Connection Error", description: error.message, variant: "destructive" });
+      toast({ title: "Error loading data", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
