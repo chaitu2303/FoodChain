@@ -56,38 +56,72 @@ export default function NgoDashboard() {
     setLoading(false);
   };
 
+  /* Shared data fetching helpers */
+  const fetchProfilesAndRoles = async () => {
+    const { data: profiles } = await supabase.from('profiles').select('*');
+    const { data: volunteers } = await supabase.from('volunteers').select('*');
+    return { profiles: profiles || [], volunteers: volunteers || [] };
+  };
+
+  const enrichDonation = (donation: any, profiles: any[], volunteers: any[], tasks: any[]) => {
+    const donorProfile = profiles.find(p => p.user_id === donation.donor_id);
+    const relatedTask = tasks.find(t => t.donation_id === donation.id);
+    let taskWithProfile = null;
+
+    if (relatedTask) {
+      const vol = volunteers.find(v => v.id === relatedTask.volunteer_id);
+      const volProfile = vol ? profiles.find(p => p.user_id === vol.user_id) : null;
+      taskWithProfile = {
+        ...relatedTask,
+        profiles: volProfile ? { full_name: volProfile.full_name, phone_number: volProfile.phone } : null
+      };
+    }
+
+    return {
+      ...donation,
+      profiles: donorProfile ? { full_name: donorProfile.full_name } : null,
+      volunteer_tasks: taskWithProfile ? [taskWithProfile] : []
+    };
+  };
+
   const fetchIncoming = async () => {
-    // Donations that are picked up or assigned and likely claimed by this NGO 
-    // (For now, assuming all picked_up donations are visible or we filter by some claim logic if implemented.
-    // simpler logic: show all 'picked_up' for demo, or if 'claimed_by' exists.
-    // We will assume if I claimed it, or if it's generally available, but 'picked_up' implies on the way.)
-    // For this demo, let's assume we see ALL 'picked_up' donations as incoming (or we'd filter by destination).
-    const { data } = await supabase
+    const { data: donations } = await supabase
       .from('donations')
-      .select(`*, profiles(full_name), volunteer_tasks(profiles(full_name, phone_number))`)
+      .select('*')
       .eq('status', 'picked_up')
       .order('updated_at', { ascending: false });
 
-    setIncomingDeliveries(data || []);
+    // Fetch related tasks for these donations
+    const donationIds = (donations || []).map(d => d.id);
+    const { data: tasks } = await supabase.from('volunteer_tasks').select('*').in('donation_id', donationIds);
+    const { profiles, volunteers } = await fetchProfilesAndRoles();
+
+    const enriched = (donations || []).map(d => enrichDonation(d, profiles, volunteers, tasks || []));
+    setIncomingDeliveries(enriched);
   };
 
   const fetchAvailable = async () => {
-    const { data } = await supabase
+    const { data: donations } = await supabase
       .from('donations')
-      .select(`*, profiles(full_name)`)
+      .select('*')
       .eq('status', 'approved')
       .order('created_at', { ascending: false });
-    setAvailableDonations(data || []);
+
+    const { profiles, volunteers } = await fetchProfilesAndRoles();
+    // Tasks might not exist yet for approved, or filtered out, but enrich function handles nulls
+    const enriched = (donations || []).map(d => enrichDonation(d, profiles, volunteers, []));
+    setAvailableDonations(enriched);
   };
 
   const fetchHistory = async () => {
-    const { data } = await supabase
+    const { data: donations } = await supabase
       .from('donations')
-      .select(`*`)
+      .select('*')
       .eq('status', 'delivered')
       .order('updated_at', { ascending: false })
       .limit(10);
-    setHistory(data || []);
+
+    setHistory(donations || []);
   };
 
   const handleConfirmReceipt = async (id: string) => {

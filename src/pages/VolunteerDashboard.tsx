@@ -50,17 +50,37 @@ export default function VolunteerDashboard() {
 
   const fetchCurrentTask = async () => {
     try {
-      // Fetch only the most relevant active task
-      const { data, error } = await supabase
+      // 1. Fetch Task
+      const { data: tasks, error } = await supabase
         .from('volunteer_tasks')
-        .select(`*, donations(*, profiles(full_name))`)
+        .select('*')
         .eq('volunteer_id', user?.id)
         .in('status', ['assigned', 'accepted', 'picked_up'])
         .order('created_at', { ascending: false })
         .limit(1);
 
       if (error) throw error;
-      setActiveTask(data && data.length > 0 ? (data[0] as any) : null);
+
+      if (tasks && tasks.length > 0) {
+        const task = tasks[0] as any;
+        // 2. Fetch Donation
+        const { data: donation } = await supabase.from('donations').select('*').eq('id', task.donation_id).single();
+
+        if (donation) {
+          // 3. Fetch Donor Profile
+          const { data: profile } = await supabase.from('profiles').select('full_name, phone').eq('user_id', donation.donor_id).single();
+
+          task.donations = {
+            ...donation,
+            profiles: profile
+          };
+          setActiveTask(task);
+        } else {
+          setActiveTask(null);
+        }
+      } else {
+        setActiveTask(null);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -70,14 +90,22 @@ export default function VolunteerDashboard() {
 
   const fetchAvailableDonations = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: donations, error } = await supabase
         .from('donations')
-        .select(`*, profiles(full_name)`)
+        .select('*')
         .eq('status', 'approved')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setAvailableDonations(data || []);
+
+      const { data: profiles } = await supabase.from('profiles').select('user_id, full_name');
+
+      const enriched = (donations || []).map(d => ({
+        ...d,
+        profiles: profiles?.find(p => p.user_id === d.donor_id)
+      }));
+
+      setAvailableDonations(enriched);
     } catch (error) {
       console.error(error);
     }
@@ -111,14 +139,14 @@ export default function VolunteerDashboard() {
 
   const handleAcceptDonation = async (donationId: string) => {
     try {
-      const { error } = await supabase
+      const { data: newTask, error } = await supabase
         .from('volunteer_tasks')
         .insert({
           donation_id: donationId,
           volunteer_id: user?.id,
           status: 'assigned'
         })
-        .select(`*, donations(*, profiles(full_name))`)
+        .select()
         .single();
 
       if (error) throw error;

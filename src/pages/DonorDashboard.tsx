@@ -98,18 +98,47 @@ export default function DonorDashboard() {
     if (user) fetchDonations();
   }, [user]);
 
+  /* Diagnostic State */
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+
   const fetchDonations = async () => {
+    setLoading(true);
+    setErrorDetails(null);
     try {
-      const { data, error } = await supabase
+      // 1. Check for Placeholder Config
+      // @ts-ignore
+      const url = supabase.supabaseUrl || "";
+      if (url.includes("YOUR_PROJECT_ID")) {
+        throw new Error("CRITICAL: You are using placeholder .env values. Please update .env with your actual Supabase URL.");
+      }
+
+      // 2. Fetch Donations ONLY (Diagnostic Mode)
+      const { data: donationsData, error: donationsError } = await supabase
         .from('donations')
-        .select(`*, volunteer_tasks(volunteer_id, profiles(full_name))`)
         .eq('donor_id', user?.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setDonations(data || []);
+      if (donationsError) throw donationsError;
+
+      // 3. Skip Joins for now to prove connection works
+      /*
+      const donationIds = (donationsData || []).map(d => d.id);
+      const { data: tasksData } = await supabase.from('volunteer_tasks').select('*').in('donation_id', donationIds);
+      const { data: volunteersData } = await supabase.from('volunteers').select('*');
+      const { data: profilesData } = await supabase.from('profiles').select('*');
+      */
+
+      // Simple map without enrichment
+      const simpleDonations = (donationsData || []).map(d => ({
+        ...d,
+        volunteer_tasks: [] // Empty for now
+      }));
+
+      setDonations(simpleDonations);
     } catch (error: any) {
       console.error(error);
+      setErrorDetails(error.message);
+      toast({ title: "Connection Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -147,6 +176,17 @@ export default function DonorDashboard() {
   return (
     <DashboardLayout role="donor">
       <div className="max-w-md mx-auto sm:max-w-2xl lg:max-w-4xl space-y-6 pb-20">
+
+        {/* Error Alert */}
+        {errorDetails && (
+          <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg mb-6 flex items-center gap-3">
+            <div className="h-2 w-2 bg-red-600 rounded-full animate-pulse" />
+            <div>
+              <p className="font-bold">System Error</p>
+              <p className="text-sm font-mono mt-1">{errorDetails}</p>
+            </div>
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex items-center justify-between">

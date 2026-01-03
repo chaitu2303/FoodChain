@@ -78,24 +78,36 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // 1. Fetch Donations
       const { data: donationsData, error: donationsError } = await supabase
         .from('donations')
-        .select('*, profiles(full_name)')
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (donationsError) throw donationsError;
+      if (donationsError) {
+        console.error("Donations fetch error:", donationsError);
+        throw new Error(`Donations: ${donationsError.message}`);
+      }
 
+      // 2. Fetch Profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error("Profiles fetch error:", profilesError);
+        throw new Error(`Profiles: ${profilesError.message}`);
+      }
 
+      // 3. Fetch User Roles
       const { data: rolesData, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error("Roles fetch error:", rolesError);
+        throw new Error(`Roles: ${rolesError.message}`);
+      }
 
       const usersWithRoles = (profilesData || []).map(profile => {
         const roleEntry = rolesData?.find(r => r.user_id === profile.user_id);
@@ -105,7 +117,16 @@ export default function AdminDashboard() {
         };
       });
 
-      setDonations(donationsData as any || []);
+      // Manually join profiles to donations
+      const mappedDonations = (donationsData || []).map((d: any) => {
+        const donorProfile = profilesData?.find(p => p.user_id === d.donor_id);
+        return {
+          ...d,
+          profiles: donorProfile ? { full_name: donorProfile.full_name } : null
+        };
+      });
+
+      setDonations(mappedDonations);
       setUsers(usersWithRoles);
 
       const active = (donationsData || []).filter(d => d.status === 'pending' || d.status === 'approved').length;
