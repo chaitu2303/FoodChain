@@ -72,12 +72,16 @@ export default function AdminDashboard() {
     completed: 0
   });
 
+  /* Migration Check State */
+  const [migrationMissing, setMigrationMissing] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
+    setMigrationMissing(false);
     try {
       // 1. Fetch Donations
       const { data: donationsData, error: donationsError } = await supabase
@@ -142,11 +146,22 @@ export default function AdminDashboard() {
 
     } catch (error: any) {
       console.error("Error fetching data:", error);
-      toast({
-        title: "Error fetching data",
-        description: error.message,
-        variant: "destructive",
-      });
+
+      // Check for missing table error
+      if (error.message && error.message.includes("does not exist")) {
+        setMigrationMissing(true);
+        toast({
+          title: "Database Setup Required",
+          description: "Required tables are missing. Please look at the dashboard for instructions.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error fetching data",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -295,6 +310,28 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
+
+        {/* Migration Alert */}
+        {migrationMissing && (
+          <div className="bg-red-50 border-2 border-red-500 rounded-xl p-6 shadow-xl animate-bounce-subtle">
+            <h2 className="text-xl font-bold text-red-800 flex items-center gap-2">
+              <Ban className="h-6 w-6" /> Database Setup Required
+            </h2>
+            <p className="text-red-700 mt-2">
+              The application cannot find the required tables (e.g., <code>user_roles</code>).
+              This usually happens when the SQL migration hasn't been run.
+            </p>
+            <div className="mt-4 bg-white p-4 rounded border border-red-200 font-mono text-sm overflow-x-auto">
+              1. Copy the SQL from <code>supabase/migrations/20250103_full_schema.sql</code><br />
+              2. Go to <a href="https://app.supabase.com" target="_blank" className="underline font-bold text-blue-600">Supabase Dashboard</a> &gt; SQL Editor<br />
+              3. Paste & Run the script.
+            </div>
+            <Button className="mt-4" variant="destructive" onClick={fetchData}>
+              I have run the SQL - Try Again
+            </Button>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
