@@ -236,7 +236,7 @@ export default function Auth({ forcedRole, forcedMode }: AuthProps) {
     if (forcedRole === 'donor') return mode === 'login' ? "Donor Login" : "Donor Signup";
     if (forcedRole === 'ngo') return mode === 'login' ? "NGO Login" : "NGO Partner Signup";
     if (forcedRole === 'volunteer') return mode === 'login' ? "Volunteer Login" : "Volunteer Signup";
-    if (forcedRole === 'admin') return mode === 'login' ? "Admin Login" : "Admin Usage Only"; // unlikely to have public signup
+    if (forcedRole === 'admin') return mode === 'login' ? "Admin Login" : "Admin Signup"; // unlikely to have public signup
     return mode === "login" ? "Welcome back" : "Create your account";
   }
 

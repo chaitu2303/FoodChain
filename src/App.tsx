@@ -60,7 +60,7 @@ const App = () => (
             <Route path="/signup/ngo" element={<Auth forcedRole="ngo" forcedMode="register" />} />
             <Route path="/signup/volunteer" element={<Auth forcedRole="volunteer" forcedMode="register" />} />
             {/* No public signup for admin, but route exists for completeness if needed, or redirect to Login */}
-            <Route path="/signup/admin" element={<Navigate to="/login/admin" />} />
+            <Route path="/signup/admin" element={<Auth forcedRole="admin" forcedMode="register" />} />
 
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
