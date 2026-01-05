@@ -24,6 +24,8 @@ interface AuthContextType {
   isLoading: boolean;
   signUp: (email: string, password: string, metadata: { full_name: string; phone: string; location: string; role: AppRole }) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithOtp: (phone: string, metadata?: { full_name: string; location: string; role: AppRole }) => Promise<{ error: Error | null }>;
+  verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isVerified: boolean;
   isApproved: boolean;
@@ -147,6 +149,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signInWithOtp = async (phone: string, metadata?: any) => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone,
+        options: {
+          data: metadata
+        }
+      });
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const verifyOtp = async (phone: string, token: string) => {
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone,
+        token,
+        type: 'sms',
+      });
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -168,6 +199,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         signUp,
         signIn,
+        signInWithOtp,
+        verifyOtp,
         signOut,
         isVerified,
         isApproved: role === 'admin' ? true : isApproved, // Admins auto-approved

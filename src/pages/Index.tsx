@@ -139,6 +139,11 @@ export default function Index() {
 
   useEffect(() => {
     if (location.hash) {
+      // Ignore Supabase auth hashes
+      if (location.hash.includes('access_token') || location.hash.includes('error_description') || location.hash.includes('type=recovery')) {
+        return;
+      }
+
       const element = document.getElementById(location.hash.substring(1));
       if (element) {
         setTimeout(() => {
