@@ -51,7 +51,8 @@ interface UserProfile {
   location: string | null;
   role?: string;
   is_verified?: boolean;
-  approved?: boolean; // Added field
+  approved?: boolean;
+  created_at?: string; // Standard Supabase timestamp
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
@@ -239,9 +240,14 @@ export default function AdminDashboard() {
   const handleVerifyUser = async (userId: string, status: boolean) => {
     try {
       // Update Access Approval (Profiles)
+      const updates: any = { approved: status, is_verified: status };
+      if (status) {
+        updates.first_login = false; // Mark first login as done upon approval as per requirements
+      }
+
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ approved: status, is_verified: status }) // Sync both for clarity
+        .update(updates)
         .eq('user_id', userId);
 
       if (profileError) throw profileError;
@@ -552,6 +558,9 @@ export default function AdminDashboard() {
                                 </div>
                                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                                   {user.phone || "No phone"} • {user.location || "No location"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Registered: {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                                 </p>
                               </div>
                             </div>
