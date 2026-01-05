@@ -94,7 +94,7 @@ export default function AdminDashboard() {
         throw new Error(`Donations: ${donationsError.message}`);
       }
 
-      // 2. Fetch Profiles
+      // 2. Fetch Profiles (now includes role and approved)
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
@@ -104,24 +104,13 @@ export default function AdminDashboard() {
         throw new Error(`Profiles: ${profilesError.message}`);
       }
 
-      // 3. Fetch User Roles
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*');
-
-      if (rolesError) {
-        console.error("Roles fetch error:", rolesError);
-        throw new Error(`Roles: ${rolesError.message}`);
-      }
-
-      const usersWithRoles = (profilesData || []).map(profile => {
-        const roleEntry = rolesData?.find(r => r.user_id === profile.user_id);
-        return {
-          ...profile,
-          role: roleEntry?.role || 'user',
-          approved: roleEntry?.approved || false
-        };
-      });
+      // No need to fetch user_roles or join manually
+      // Ensure role defaults are handled if null (though DB should handle it)
+      const usersData = (profilesData || []).map(p => ({
+        ...p,
+        role: p.role || 'user',
+        approved: p.approved || false
+      }));
 
       // Manually join profiles to donations
       const mappedDonations = (donationsData || []).map((d: any) => {
@@ -133,7 +122,7 @@ export default function AdminDashboard() {
       });
 
       setDonations(mappedDonations);
-      setUsers(usersWithRoles);
+      setUsers(usersData); // usersData fits UserProfile interface if updated to match DB
 
       const active = (donationsData || []).filter(d => d.status === 'pending' || d.status === 'approved').length;
       const done = (donationsData || []).filter(d => d.status === 'delivered').length;
@@ -249,21 +238,13 @@ export default function AdminDashboard() {
 
   const handleVerifyUser = async (userId: string, status: boolean) => {
     try {
-      // 1. Update Profile Verification (Legacy/NGO specific)
+      // Update Access Approval (Profiles)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ is_verified: status })
+        .update({ approved: status, is_verified: status }) // Sync both for clarity
         .eq('user_id', userId);
 
       if (profileError) throw profileError;
-
-      // 2. Update Access Approval (User Roles)
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .update({ approved: status })
-        .eq('user_id', userId);
-
-      if (roleError) throw roleError;
 
       toast({
         title: status ? "Access Granted" : "Access Revoked",

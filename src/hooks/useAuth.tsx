@@ -14,6 +14,8 @@ interface Profile {
   avatar_url: string | null;
   is_verified: boolean;
   verification_badge: string | null;
+  role: AppRole;
+  approved: boolean;
 }
 
 interface AuthContextType {
@@ -78,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      // Fetch profile
+      // Fetch profile with role and approval
       const { data: profileData } = await supabase
         .from("profiles")
         .select("*")
@@ -87,22 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileData) {
         setProfile(profileData as Profile);
-      }
-
-      // Fetch role & approval
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role, approved")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (roleData) {
-        setRole(roleData.role as AppRole);
-        setIsApproved(roleData.approved);
+        setRole(profileData.role as AppRole);
+        setIsApproved(profileData.approved);
       } else {
-        // Fallback to metadata if DB entry is not yet ready
+        // Fallback: If profile missing, use metadata (but mark as not approved to be safe)
         const metaRole = (await supabase.auth.getUser()).data.user?.user_metadata?.role;
-        if (metaRole) setRole(metaRole as AppRole);
+        if (metaRole) {
+          setRole(metaRole as AppRole);
+          setIsApproved(metaRole === 'admin'); // Only admins auto-approved in fallback
+        }
       }
     } catch (error) {
       console.error("Error fetching user data:", error);

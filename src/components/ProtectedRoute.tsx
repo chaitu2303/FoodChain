@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, role, isLoading, isVerified } = useAuth();
+  const { user, role, isLoading, isApproved } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -28,10 +28,9 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   // Admin bypasses verification check to allow them to verify others
-  // Check both state role and metadata role to be safe
-  const isAdmin = role === 'admin' || user?.user_metadata?.role === 'admin';
+  const isAdmin = role === 'admin';
 
-  if (!isAdmin && !isVerified) {
+  if (!isAdmin && !isApproved) {
     return <PendingApproval />;
   }
 
