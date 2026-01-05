@@ -44,8 +44,7 @@ interface Donation {
 }
 
 interface UserProfile {
-  id: string;
-  user_id: string;
+  id: string; // The primary key (uuid) which is also the user_id reference
   full_name: string | null;
   phone: string | null;
   location: string | null;
@@ -115,7 +114,7 @@ export default function AdminDashboard() {
 
       // Manually join profiles to donations
       const mappedDonations = (donationsData || []).map((d: any) => {
-        const donorProfile = profilesData?.find(p => p.user_id === d.donor_id);
+        const donorProfile = profilesData?.find(p => p.id === d.donor_id);
         return {
           ...d,
           profiles: donorProfile ? { full_name: donorProfile.full_name } : null
@@ -185,7 +184,7 @@ export default function AdminDashboard() {
             .from('volunteer_tasks')
             .insert({
               donation_id: id,
-              volunteer_id: chosenVol.user_id,
+              volunteer_id: chosenVol.id,
               status: 'assigned'
             });
 
@@ -228,7 +227,7 @@ export default function AdminDashboard() {
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return;
     try {
-      const { error } = await supabase.from('profiles').delete().eq('user_id', userId);
+      const { error } = await supabase.from('profiles').delete().eq('id', userId);
       if (error) throw error;
       toast({ title: "User Deleted", description: "Profile removed successfully." });
       fetchData();
@@ -248,7 +247,7 @@ export default function AdminDashboard() {
       const { error: profileError } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('user_id', userId);
+        .eq('id', userId);
 
       if (profileError) throw profileError;
 
@@ -568,11 +567,11 @@ export default function AdminDashboard() {
                               <Button
                                 variant={user.approved ? "outline" : "default"}
                                 size="sm"
-                                onClick={() => handleVerifyUser(user.user_id, !user.approved)}
+                                onClick={() => handleVerifyUser(user.id, !user.approved)}
                               >
                                 {user.approved ? "Revoke Access" : "Grant Access"}
                               </Button>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteUser(user.user_id)}>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteUser(user.id)}>
                                 <Ban className="w-4 h-4" />
                               </Button>
                             </div>
