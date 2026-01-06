@@ -49,7 +49,6 @@ interface UserProfile {
   phone: string | null;
   location: string | null;
   role?: string;
-  is_verified?: boolean;
   approved?: boolean;
   created_at?: string; // Standard Supabase timestamp
 }
@@ -171,7 +170,7 @@ export default function AdminDashboard() {
       // 2. Auto-Allocate Volunteer if Approved
       if (newStatus === 'approved') {
         // Find nearest verified volunteer
-        const verifiedVolunteers = users.filter(u => u.role === 'volunteer' && u.is_verified);
+        const verifiedVolunteers = users.filter(u => u.role === 'volunteer' && u.approved);
 
         if (verifiedVolunteers.length > 0) {
           // SIMULATION: In a real app, we would calculate Haversine distance between 
@@ -239,7 +238,7 @@ export default function AdminDashboard() {
   const handleVerifyUser = async (userId: string, status: boolean) => {
     try {
       // Update Access Approval (Profiles)
-      const updates: any = { approved: status, is_verified: status };
+      const updates: any = { approved: status };
       if (status) {
         updates.first_login = false; // Mark first login as done upon approval as per requirements
       }
